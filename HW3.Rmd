@@ -1,0 +1,166 @@
+---
+title: "Homework 3"
+author: "Team 1"
+date: "October 29, 2020"
+output: html_document
+---
+
+# 1. Data Exploration
+
+
+
+# 2. Data Preparation
+
+
+
+# 3. Build Models
+
+
+
+# 4. Select Models
+
+
+
+# Appendix
+
+
+# Library
+
+```{r}
+# load required packages
+library(ggplot2)
+library(dplyr)
+#library(tidyr)
+library(corrplot)
+library(MASS)
+library(caret)
+library(RCurl)
+library(tidyverse)
+library(pROC)
+library(RCurl)
+```
+
+```{r import}
+# Loading the data
+git_dir <- 'https://raw.github.com/odonnell31/DATA621-HW3/master/data'
+train_df = read.csv(paste(git_dir, "/crime-training-data_modified.csv", sep=""))
+test_df = read.csv(paste(git_dir, "/crime-evaluation-data_modified.csv", sep = ""))
+head(train_df)
+```
+
+# Data Exploration & Preparation
+
+
+See a summary of each column in the train_df set
+```{r train_dfing_data_summary}
+# view a summary of all columns
+summary(train_df)
+```
+
+```{r}
+# Correlations 
+cor_train = cor(train_df,  use = "na.or.complete")
+#cor_train = cor(train_df[sapply(train_df, function(x) !is.factor(x))])
+corrplot(cor_train)
+```
+
+```{r}
+pairs(~ target + zn + indus
+      + chas + nox + rm + age + dis + rad + tax + ptratio + lstat + medv, data = train_df)
+```
+
+```{r}
+# look at the structure of the variables
+str(train_df)
+str(test_df)
+```
+
+The summary() function for the training and testing data sets indicates that there are no missing values in the data. 
+The response variable "target" is binary with 1 indicates crime rate is above median cirme rate and 0 indicates crime rate is not above median crime rate. 
+
+Let's observe how the target variable is effected by other factors:
+1. The plot of "target" against "age" shows target equalling one (above median crime rate) increases as the proportion of owner-occupied units built prior to 1940 increaases; the boxplot further shows that a larger mean of proportions of owner-occupied units built prior to 1940 is assoicated with higher crime rate.
+2. Plots of crime rate against pupil-teacher ratio indicate higher crime rate "1" is associated with higher pupil-teacher ratio.
+
+```{r}
+par(mfrow=c(2,2))
+# plot response variable "target" against predictor variable "age" 
+plot(train_df$age,train_df$target)
+boxplot(age ~ target, train_df )
+# plot response variable "target" against predictor variable "ptratio"
+plot(train_df$ptratio,train_df$target)
+boxplot(ptratio ~ target, train_df)
+```
+
+NA stuff
+```{r}
+has_NA = names(which(sapply(train_df, anyNA)))
+has_NA
+```
+There are no NAs
+
+
+# Modeling
+
+## 1) Binary Logistic Regression
+
+```{r}
+# preliminary exploration glm models
+glm(formula = target ~ age, family = binomial(), data = train_df)
+glm(formula = target ~ ptratio , family = binomial(), data = train_df)
+```
+
+### All predictor model
+```{r}
+all_preds = glm(target ~ ., family = binomial, data = train_df)
+summary(all_preds)
+train_df$preds = ifelse(all_preds$fitted.values > 0.5, 1, 0)
+# look at confusion matrix
+cm = confusionMatrix(as_factor(train_df$preds), as_factor(train_df$target), positive = "1")
+cm
+```
+
+
+```{r}
+step_all_preds = stepAIC(all_preds)
+summary(step_all_preds)
+train_df$preds = ifelse(step_all_preds$fitted.values > 0.5, 1, 0)
+# look at confusion matrix
+cm = confusionMatrix(as_factor(train_df$preds), as_factor(train_df$target), positive = "1")
+cm
+```
+
+### Try treating chas and rad as factors
+
+```{r}
+# Based on data dictionary in hw assignment pdf and looking at the df,
+# chas and rad should probably be factors
+train_df2 = cbind(train_df)
+train_df2$chas = as.factor(train_df2$chas)
+train_df2$rad = as.factor(train_df2$rad)
+all_preds_fac = glm(target ~ ., family = binomial, data = train_df2)
+summary(all_preds_fac)
+train_df2$preds = ifelse(all_preds_fac$fitted.values > 0.5, 1, 0)
+# look at confusion matrix
+cm = confusionMatrix(as_factor(train_df2$preds), as_factor(train_df2$target), positive = "1")
+cm
+```
+
+```{r}
+step_all_preds_fac = stepAIC(all_preds_fac)
+summary(step_all_preds_fac)
+train_df2$preds = ifelse(step_all_preds_fac$fitted.values > 0.5, 1, 0)
+train_df2$pred_proba = step_all_preds_fac$fitted.values
+# look at confusion matrix
+cm = confusionMatrix(as_factor(train_df2$preds), as_factor(train_df2$target), positive = "1")
+cm
+```
+
+```{r}
+hist(step_all_preds_fac$fitted.values, main= "Histogram of Predicted Probabilities", xlab="Predicted Probabilities")
+```
+
+```{r}
+proc = roc(train_df2$target, train_df2$pred_proba)
+plot(proc, asp=NA, legacy.axes=TRUE, print.auc=TRUE, xlab="Specificity")
+```
