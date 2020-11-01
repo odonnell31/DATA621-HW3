@@ -2,7 +2,9 @@
 title: "Homework 3"
 author: "Team 1"
 date: "October 29, 2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 # 1. Data Exploration
@@ -40,20 +42,19 @@ To finally select a model, we used Stepwise AIC (both backward and forward) to d
 # Appendix
 
 
-# Library
+## Import Libraries and Data
 
 ```{r}
 # load required packages
 library(ggplot2)
 library(dplyr)
-#library(tidyr)
 library(corrplot)
 library(MASS)
 library(caret)
 library(RCurl)
-#library(tidyverse)
 library(pROC)
 library(RCurl)
+library(haven)
 ```
 
 ```{r import}
@@ -65,8 +66,7 @@ test_df = read.csv(paste(git_dir, "/crime-evaluation-data_modified.csv", sep = "
 head(train_df)
 ```
 
-# Data Exploration & Preparation
-
+## Data Exploration & Preparation
 
 See a summary of each column in the train_df set
 ```{r train_dfing_data_summary}
@@ -75,9 +75,8 @@ summary(train_df)
 ```
 
 ```{r}
-# Correlations 
+# look at correlations 
 cor_train = cor(train_df,  use = "na.or.complete")
-#cor_train = cor(train_df[sapply(train_df, function(x) !is.factor(x))])
 corrplot(cor_train)
 ```
 
@@ -97,7 +96,7 @@ plot(train_df$ptratio,train_df$target)
 boxplot(ptratio ~ target, train_df)
 ```
 
-NA stuff
+Check for NA's
 ```{r}
 has_NA = names(which(sapply(train_df, anyNA)))
 has_NA
@@ -105,9 +104,9 @@ has_NA
 There are no NAs
 
 
-# Modeling
+## Modeling
 
-## 1) Binary Logistic Regression
+### 1) Binary Logistic Regression
 
 ```{r}
 # preliminary exploration glm models
@@ -115,11 +114,13 @@ glm(formula = target ~ age, family = binomial(), data = train_df)
 glm(formula = target ~ ptratio , family = binomial(), data = train_df)
 ```
 
-### All predictor model
+### All predictor models
+
 ```{r}
 all_preds = glm(target ~ ., family = binomial, data = train_df)
 summary(all_preds)
 train_df$preds = ifelse(all_preds$fitted.values > 0.5, 1, 0)
+
 # look at confusion matrix
 cm = confusionMatrix(as_factor(train_df$preds), as_factor(train_df$target), positive = "1")
 cm
@@ -130,6 +131,7 @@ cm
 step_all_preds = stepAIC(all_preds)
 summary(step_all_preds)
 train_df$preds = ifelse(step_all_preds$fitted.values > 0.5, 1, 0)
+
 # look at confusion matrix
 cm = confusionMatrix(as_factor(train_df$preds), as_factor(train_df$target), positive = "1")
 cm
@@ -146,6 +148,7 @@ train_df2$rad = as.factor(train_df2$rad)
 all_preds_fac = glm(target ~ ., family = binomial, data = train_df2)
 summary(all_preds_fac)
 train_df2$preds = ifelse(all_preds_fac$fitted.values > 0.5, 1, 0)
+
 # look at confusion matrix
 #cm = confusionMatrix(as_factor(train_df2$preds), as_factor(train_df2$target), positive = "1")
 #cm
@@ -156,13 +159,16 @@ step_all_preds_fac = stepAIC(all_preds_fac)
 summary(step_all_preds_fac)
 train_df2$preds = ifelse(step_all_preds_fac$fitted.values > 0.5, 1, 0)
 train_df2$pred_proba = step_all_preds_fac$fitted.values
+
 # look at confusion matrix
-#cm = confusionMatrix(as_factor(train_df2$preds), as_factor(train_df2$target), positive = "1")
-#cm
+cm = confusionMatrix(as_factor(train_df2$preds), as_factor(train_df2$target), positive = "1")
+cm
 ```
 
 ```{r}
-hist(step_all_preds_fac$fitted.values, main= "Histogram of Predicted Probabilities", xlab="Predicted Probabilities")
+hist(step_all_preds_fac$fitted.values,
+     main= "Histogram of Predicted Probabilities",
+     xlab="Predicted Probabilities")
 ```
 
 ```{r}
